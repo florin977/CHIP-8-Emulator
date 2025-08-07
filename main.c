@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
+#include <limits.h>
 #include <SDL3/SDL.h>
 
 #define CHIP8_WIDTH 64
@@ -32,7 +35,7 @@ typedef struct memory_t
     uint16_t PC;
     uint16_t i;
     uint8_t RAM[4096];
-    uint8_t reg[16];
+    uint8_t v[16];
 } memory_t;
 
 typedef struct timers_t
@@ -51,22 +54,22 @@ typedef struct CPU
 } CPU;
 
 uint8_t fonts[FONTS_SIZE] = {
-0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-0x20, 0x60, 0x20, 0x20, 0x70, // 1
-0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
 FILE *open_file(const char *filename)
@@ -83,6 +86,8 @@ FILE *open_file(const char *filename)
 
 SDL_AppResult initWindow()
 {
+    srand(time(NULL));
+
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
         SDL_Log("Could not initialize SDL: %s\n", SDL_GetError());
@@ -116,7 +121,7 @@ void draw(CPU *cpu)
             if (cpu->display[i][j])
             {
                 SDL_FRect currentPixel = {i * DISPLAY_SCALE, j * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE};
-                
+
                 SDL_RenderFillRect(renderer, &currentPixel);
             }
         }
@@ -144,7 +149,7 @@ void loadFont(CPU *cpu)
 long loadROM(CPU *cpu, const char *filename)
 {
     FILE *ROM = NULL;
-    
+
     if ((ROM = open_file(filename)) == NULL)
     {
         exit(-1);
@@ -188,6 +193,77 @@ void clearDisplay(CPU *cpu)
     SDL_RenderPresent(renderer);
 }
 
+uint8_t getKey(SDL_Event *e)
+{
+    switch (e->key.scancode)
+    {
+    /* code */
+    case SDL_SCANCODE_1:
+    case SDL_SCANCODE_2:
+    case SDL_SCANCODE_3:
+    case SDL_SCANCODE_4:
+        return e->key.scancode - SDL_SCANCODE_1;
+
+    case SDL_SCANCODE_Q:
+        return 4;
+
+    case SDL_SCANCODE_W:
+        return 5;
+
+    case SDL_SCANCODE_E:
+        return 6;
+
+    case SDL_SCANCODE_R:
+        return 7;
+
+    case SDL_SCANCODE_A:
+        return 8;
+
+    case SDL_SCANCODE_S:
+        return 9;
+
+    case SDL_SCANCODE_D:
+        return 10;
+
+    case SDL_SCANCODE_F:
+        return 11;
+
+    case SDL_SCANCODE_Z:
+        return 12;
+
+    case SDL_SCANCODE_X:
+        return 13;
+
+    case SDL_SCANCODE_C:
+        return 14;
+
+    case SDL_SCANCODE_V:
+        return 15;
+
+    default:
+        return 0;
+    }
+}
+
+uint8_t handleEvents(SDL_Event *e, uint8_t *quit_app, CPU *cpu)
+{
+    while (SDL_PollEvent(&e))
+        {
+            if (e->type == SDL_EVENT_QUIT)
+            {
+                quit_app = 1;
+                return 1;
+            }
+            if (e->type = SDL_EVENT_KEY_DOWN)
+            {
+                cpu->input = getKey(&e);
+                return 1;
+            }
+
+            return 0;
+        }
+}
+
 int main()
 {
     CPU mainCPU;
@@ -203,21 +279,22 @@ int main()
 
     initWindow();
 
-    for (int i = 0; i < ROM_size / 2; i++)
+    uint8_t quit_app = 0;
+
+    while (!quit_app)
     {
-        uint16_t instruction = fetch(&mainCPU);
+        SDL_Event e;
 
-        uint8_t opcode = OPCODE(instruction);
+        handleEvents(&e, &quit_app, &mainCPU);
 
-        /*
-        uint8_t x = X(instruction);
-        uint8_t y = Y(instruction);
-        uint8_t n = N(instruction);
-        printf("%0X %0X %0X %0X\n", opcode, x, y, n);
-        */
-
-        switch (opcode)
+        for (int i = 0; i < ROM_size / 2; i++)
         {
+            uint16_t instruction = fetch(&mainCPU);
+
+            uint8_t opcode = OPCODE(instruction);
+
+            switch (opcode)
+            {
             case 0:
             {
                 uint8_t x = X(instruction);
@@ -228,36 +305,82 @@ int main()
                 {
                     clearDisplay(&mainCPU);
                 }
+                else if (n == 0xE)
+                {
+                    if (mainCPU.stack.sp <= 0)
+                    {
+                        fprintf(stderr, "Stack out of bounds\n");
+                        exit(-1);
+                    }
 
-            break;
+                    mainCPU.stack.sp--;
+                    mainCPU.memory.PC = mainCPU.stack.stack[mainCPU.stack.sp];
+                }
+                else
+                {
+                    // Call instruction
+                }
+
+                break;
             }
-                
+
             case 1:
             {
                 uint16_t nnn = NNN(instruction);
 
                 mainCPU.memory.PC = nnn;
-            break;
+                break;
             }
 
             case 2:
-            { 
-            break;
+            {
+                uint16_t nnn = NNN(instruction);
+
+                mainCPU.stack.stack[mainCPU.stack.sp] = mainCPU.memory.PC;
+                mainCPU.stack.sp++;
+
+                mainCPU.memory.PC = nnn;
+
+                break;
             }
-                
+
             case 3:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t nn = NN(instruction);
+
+                if (mainCPU.memory.v[x] == nn)
+                {
+                    mainCPU.memory.PC += 2;
+                }
+
+                break;
             }
-                
+
             case 4:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t nn = NN(instruction);
+
+                if (mainCPU.memory.v[x] != nn)
+                {
+                    mainCPU.memory.PC += 2;
+                }
+
+                break;
             }
-                
+
             case 5:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t y = Y(instruction);
+
+                if (mainCPU.memory.v[x] == mainCPU.memory.v[y])
+                {
+                    mainCPU.memory.PC += 2;
+                }
+
+                break;
             }
 
             case 6:
@@ -265,45 +388,134 @@ int main()
                 uint8_t x = X(instruction);
                 uint8_t nn = NN(instruction);
 
-                mainCPU.memory.reg[x] = nn;
-            break;
+                mainCPU.memory.v[x] = nn;
+                break;
             }
-                
+
             case 7:
             {
                 uint8_t x = X(instruction);
                 uint8_t nn = NN(instruction);
 
-                mainCPU.memory.reg[x] += nn;
-            break;
+                mainCPU.memory.v[x] += nn;
+                break;
             }
 
             case 8:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t y = Y(instruction);
+                uint8_t n = N(instruction);
+
+                switch (n)
+                {
+                case 0:
+                {
+                    mainCPU.memory.v[x] = mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 1:
+                {
+                    mainCPU.memory.v[x] |= mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 2:
+                {
+                    mainCPU.memory.v[x] &= mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 3:
+                {
+                    mainCPU.memory.v[x] ^= mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 4:
+                {
+                    uint16_t sum = mainCPU.memory.v[x] + mainCPU.memory.v[y];
+
+                    mainCPU.memory.v[0xF] = (sum > 0XFF) ? 1 : 0;
+                    mainCPU.memory.v[x] += mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 5:
+                {
+                    mainCPU.memory.v[0xF] = (mainCPU.memory.v[x] > mainCPU.memory.v[y]) ? 1 : 0;
+                    mainCPU.memory.v[x] -= mainCPU.memory.v[y];
+                    break;
+                }
+
+                case 6:
+                {
+                    uint8_t LSB = mainCPU.memory.v[x] & 0x01;
+
+                    mainCPU.memory.v[0xF] = LSB;
+                    mainCPU.memory.v[x] >>= 1;
+                    break;
+                }
+
+                case 7:
+                {
+                    mainCPU.memory.v[0xF] = (mainCPU.memory.v[y] > mainCPU.memory.v[x]) ? 1 : 0;
+                    mainCPU.memory.v[x] = mainCPU.memory.v[y] - mainCPU.memory.v[x];
+                    break;
+                }
+
+                case 0xE:
+                {
+                    uint8_t MSB = (mainCPU.memory.v[x] & 0x80) >> 7;
+
+                    mainCPU.memory.v[0xF] = MSB;
+                    mainCPU.memory.v[x] <<= 1;
+                    break;
+                }
+                }
+                break;
             }
-                
+
             case 9:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t y = Y(instruction);
+
+                if (mainCPU.memory.v[x] != mainCPU.memory.v[y])
+                {
+                    mainCPU.memory.PC += 2;
+                }
+
+                break;
             }
-                
+
             case 0xA:
             {
                 uint16_t nnn = NNN(instruction);
 
                 mainCPU.memory.i = nnn;
-            break;
+
+                break;
             }
-                
+
             case 0xB:
             {
-            break;
+                uint16_t nnn = NNN(instruction);
+
+                mainCPU.memory.PC = mainCPU.memory.v[0] + nnn;
+
+                break;
             }
-                
+
             case 0xC:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t nn = NN(instruction);
+
+                mainCPU.memory.v[x] = (rand() % 256) & nn;
+
+                break;
             }
 
             case 0xD:
@@ -314,35 +526,137 @@ int main()
 
                 uint16_t i_copy = mainCPU.memory.i;
 
+                mainCPU.memory.v[0xF] = 0;
+
                 for (int j = 0; j < n; j++)
                 {
-                    uint8_t currentRow = mainCPU.memory.RAM[i_copy];
+                    uint8_t current_row = mainCPU.memory.RAM[i_copy];
                     i_copy++;
 
                     for (int i = 0; i < 8; i++)
                     {
-                        mainCPU.display[mainCPU.memory.reg[x] + i][mainCPU.memory.reg[y] + j] = ((currentRow & (1 << (7 - i))) >> (7 - i));
+                        uint8_t next_pixel_value = ((current_row & (1 << (7 - i))) >> (7 - i));
+                        uint8_t current_pixel_value = mainCPU.display[mainCPU.memory.v[x] + i][mainCPU.memory.v[y] + j];
+
+                        if (current_pixel_value ^ next_pixel_value != current_pixel_value)
+                        {
+                            mainCPU.memory.v[0xF] = 1;
+                        }
+
+                        mainCPU.display[mainCPU.memory.v[x] + i][mainCPU.memory.v[y] + j] = current_pixel_value ^ next_pixel_value;
                     }
                 }
 
                 draw(&mainCPU);
 
-            break;
+                break;
             }
-                
+
             case 0xE:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t nn = NN(instruction);
+
+                switch (nn)
+                {
+                case 0x9E:
+                {
+                    uint8_t reg_key = mainCPU.memory.v[x] & 0x0F;
+
+                    if (mainCPU.input == reg_key)
+                    {
+                        mainCPU.memory.PC += 2;
+                    }
+
+                    break;
+                }
+
+                case 0xA1:
+                {
+                    uint8_t reg_key = mainCPU.memory.v[x] & 0x0F;
+
+                    if (mainCPU.input != reg_key)
+                    {
+                        mainCPU.memory.PC += 2;
+                    }
+
+                    break;
+                }
+                }
+                break;
             }
-                
+
             case 0xF:
             {
-            break;
+                uint8_t x = X(instruction);
+                uint8_t nn = NN(instruction);
+
+                switch (nn)
+                {
+                case 0x07:
+                {
+                    mainCPU.memory.v[x] = mainCPU.timers.delay_timer;
+
+                    break;
+                }
+
+                case 0x0A:
+                {
+                    while (!handleEvents(&e, &quit_app, &mainCPU))
+                    {
+                        // Timers should still work
+                    }
+
+                    mainCPU.memory.v[x] = mainCPU.input;
+                }
+
+                case 0x15:
+                {
+                    mainCPU.timers.delay_timer = mainCPU.memory.v[x];
+                    break;
+                }
+                
+                case 0x18:
+                {
+                    mainCPU.timers.sound_timer = mainCPU.memory.v[x];
+                    break;
+                }
+
+                case 0x1E:
+                {
+                    mainCPU.memory.i += mainCPU.memory.v[x];
+                    break;
+                }
+
+                case 0x29:
+                {
+                    uint8_t lowest_nibble = mainCPU.memory.v[x] & 0x0F;
+                    
+                    mainCPU.memory.i = FONTS_START_ADDRESS + lowest_nibble * 5;
+                    break;
+                }
+
+                case 0x33:
+                {
+
+                }
+
+                case 0x55:
+                {
+
+                }
+
+                case 0x65:
+                {
+                    
+                }
+                
+                }
+            }
+
             }
         }
     }
-    
-    SDL_Delay(2000);
 
     quitSDL();
 
